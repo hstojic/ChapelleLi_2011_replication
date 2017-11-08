@@ -13,7 +13,7 @@
 # list of needed packages
 packages <- c('ggplot2' = "2.2.1", 'dplyr' = "0.7.4", 'reshape2' = "1.4.2", 
               'ggrepel' = "0.6.5", 'doParallel' = "1.0.10", 
-              'foreach' = "1.4.3", 'doRNG' = "1.6.6")
+              'foreach' = "1.4.3", 'doRNG' = "1.6.6", "scales" = "0.4.1")
 
 # installing the packages, attempting to install the exact version, if not
 # already present 
@@ -38,9 +38,9 @@ lapply(names(packages), library, character.only = TRUE)
 
 # font setup
 fontSetup <- "Helvetica"
-fontSize <- 3.15 
+fontSize <- 2.3 
 pointSize <- 1.5
-themeFontSize <- 12
+themeFontSize <- 9
 
 # theme with font sizes adjusted for plotting figures with tikz device
 pdftheme <- 
@@ -56,7 +56,7 @@ pdftheme <-
         axis.ticks = element_line (colour = "black", size = 0.3), 
         axis.text = element_text(size = themeFontSize, colour = "black"),
         axis.text.x = element_text(vjust = 0.5),
-        axis.title = element_text(size = themeFontSize + 1),
+        axis.title = element_text(size = themeFontSize + 2),
         axis.title.y = element_text(vjust = 1.8),
         axis.title.x = element_text(vjust = -.8),
         legend.title = element_blank(),
@@ -65,7 +65,7 @@ pdftheme <-
         legend.text = element_text(size = themeFontSize),
         legend.key = element_rect(fill = "#FFFFFF"),
         legend.key.height = unit(0.8,"line"),
-        strip.text = element_text(size = themeFontSize + 1),
+        strip.text = element_text(size = themeFontSize + 2),
         strip.background = element_rect(fill = "#FFFFFF"),
         text = element_text(family = fontSetup),
         validate = TRUE
