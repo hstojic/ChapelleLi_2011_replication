@@ -2,15 +2,16 @@
 # Information
 # ----------------------------------------------------------------------
 
-# This script defines various models for our Bernoulli MAB task 
-# used in simulations
+# This script defines the algorithms from the paper for the 
+# Bernoulli bandit problem
 
 
 # ----------------------------------------------------------------------
 # Auxiliary functions
 # ----------------------------------------------------------------------
 
-
+# finding a max value in a vector with real numbers, randomly breaking
+# the ties
 idxMax <- function (x, tol = 1e-16) {
     stopifnot(is.numeric(x), is.numeric(tol), all(!is.na(x)))
     if (all(is.infinite(x)) || abs(max(x) - min(x)) < tol) {
@@ -25,23 +26,18 @@ idxMax <- function (x, tol = 1e-16) {
     return(idx)
 }
 
+# help function for KL divergence
 klDivergence <- function(p, q) {
     sum(p*log(p/q))
 }
 
-
-# a function for generating a Bernoulli bandit observations 
-genBernoulliBandit <- function(noTrials = 10, noArms = 2, 
-                               a = 1, b = 1, probs) {
-
-    if (missing(probs)) probs <- rbeta(noArms, a, b)
-
-    bandit <- matrix(NA, noTrials, noArms) 
-    for (trial in 1:noTrials) {
-        bandit[trial,] <- rbinom(noArms, 1, prob = probs)
-    }
-
-    return(bandit)
+# a function for generating the Bernoulli bandit observations 
+genBernoulliBandit <- function(noArms, prob) {
+    # basic checks
+    stopifnot(noArms == length(prob))
+    # make draws 
+    draws <- function() rbinom(noArms, 1, prob)
+    return(draws)
 }
 
 
@@ -50,15 +46,16 @@ genBernoulliBandit <- function(noTrials = 10, noArms = 2,
 # ----------------------------------------------------------------------
 
 
-Thompson <- function(rewards, pars, parUpdate = 100) {
+Thompson <- function(env, pars, parUpdate = 100) {
 
     # basic vars
     aPrior <- pars[["a"]]
     bPrior <- pars[["b"]]
-    noTrials <- nrow(rewards)
-    noArms <- ncol(rewards)
+    noTrials <- env$noTrials
+    noArms <- env$noArms
+    rewardFnc <- env$reward
 
-    # frames and counters 
+    # objects for results
     choices <- rep(NA, noTrials)
     success <- rep(0, noArms)
     failure <- rep(0, noArms)
@@ -66,16 +63,17 @@ Thompson <- function(rewards, pars, parUpdate = 100) {
     for (trial in 1:noTrials) {
         
         # draw prob of reward based on the model of the environment 
-        # i.e. from P(theta|data)
-        # sapply(1:noArms, function(arm) rbeta())
+        # i.e. from the posterior distribution P(theta|data)
         thetat <- rbeta(noArms, success + aPrior, failure + bPrior)
 
-        # choice according to the best estimated probability
+        # choice according to the draws from the posterior
         choice <- which.max(thetat)
         choices[trial] <- choice
-        reward <- rewards[trial, choice]
 
-        # update the model of the environment 
+        # environment returns a reward for a given choice
+        reward <- rewardFnc()[choice]
+
+        # update the model of the environment, e.g. only every 100 trials  
         if (trial %% parUpdate == 0) {
             if(reward == 0) {
                 failure[choice] <- failure[choice] + 1
@@ -85,18 +83,18 @@ Thompson <- function(rewards, pars, parUpdate = 100) {
         }
     }
 
-    payoff <- rewards[cbind(1:noTrials, choices)]
-    return(list(choices = choices, payoff = payoff))
+    return(list(choices = choices))
 }
 
 
-UCB <- function(rewards, pars, parUpdate = 100) {
+UCB <- function(env, pars, parUpdate = 100) {
 
     # basic vars
-    noTrials <- nrow(rewards)
-    noArms <- ncol(rewards)
+    noTrials <- env$noTrials
+    noArms <- env$noArms
+    rewardFnc <- env$reward
 
-    # frames 
+    # objects for results
     choices <- rep(NA, noTrials)
     k <- rep(0, noArms)  
     m <- rep(0, noArms)
@@ -111,17 +109,18 @@ UCB <- function(rewards, pars, parUpdate = 100) {
             # update delta 
             delta <- sqrt(1 / trial)
 
-            # choosing the arm with highest upper confidence bound
+            # computing the upper confidence bound
             ucbEst <- k / m + 
                       sqrt((2*(k/m)*log(1/delta)) / m) + 
                       (2*log(1/delta)) / m
         }
 
+        # choice according to the best bound
         choice <- idxMax(ucbEst)
         choices[trial] <- choice
 
-        # choice according to the best estimated probability
-        reward <- rewards[trial, choice]
+        # environment returns a reward for a given choice
+        reward <- rewardFnc()[choice]
 
         # update the model of the environment, e.g. only every 100 trials 
         if (trial %% parUpdate == 0) {
@@ -130,7 +129,6 @@ UCB <- function(rewards, pars, parUpdate = 100) {
         }
     }
 
-    payoff <- rewards[cbind(1:noTrials, choices)]
-    return(list(choices = choices, payoff = payoff))
+    return(list(choices = choices))
 }
 
