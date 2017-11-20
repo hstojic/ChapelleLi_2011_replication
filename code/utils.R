@@ -84,3 +84,20 @@ cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2",
 # The palette with black:
 cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
+
+
+# ----------------------------------------------------------------------
+# Functions
+# ----------------------------------------------------------------------
+
+# small function for recoding levels of a categorical variable,
+# requires a named vector, where names are original values and 
+# values are values to be recoded to
+changeLevels <- function(variable, labels, exp2char = TRUE) {
+    variable <- as.character(variable)
+    for (i in names(labels)) {
+        lab <- if (exp2char) as.character(labels[i]) else labels[i] 
+        variable <- ifelse(variable == i, lab, variable)
+    }
+    return(variable)
+}
