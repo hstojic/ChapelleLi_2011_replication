@@ -48,6 +48,8 @@ Thompson <- function(env, pars = list(a = 1, b = 1, alpha = 1, update = 1)) {
     bPrior <- ifelse(is.null(pars[["b"]]), 1, pars[["b"]])
     alphaReshape <- ifelse(is.null(pars[["alpha"]]), 1, pars[["alpha"]])
     update <- ifelse(is.null(pars[["update"]]), 1, pars[["update"]])
+    optimistic <- ifelse(is.null(pars[["optimistic"]]), FALSE, 
+        pars[["optimistic"]])
     noTrials <- env[["noTrials"]]
     noArms <- env[["noArms"]]
     probMax <- env[["prob"]] 
@@ -68,6 +70,12 @@ Thompson <- function(env, pars = list(a = 1, b = 1, alpha = 1, update = 1)) {
             (success + aPrior)/alphaReshape, 
             (failure + bPrior)/alphaReshape
         )
+
+        # optimistic bayesian sampling version 
+        if (optimistic) {
+            expVals <- (success + aPrior)/(success + aPrior + failure + bPrior)
+            thetat <- apply(rbind(thetat, expVals), 2, max)
+        }
 
         # choice according to the draws from the posterior
         choice <- which.max(thetat)
