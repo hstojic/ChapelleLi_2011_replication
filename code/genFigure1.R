@@ -22,10 +22,10 @@ rm(list = ls())
 source("utils.R")
 
 # load the dataset
-load(file = "../data/bernoulliBandit.RData")
+load(file = "../data/banditBasic1.RData")
 
 # outDir
-outDir <- ""
+outDir <- "../article/"
 
 
 # ----------------------------------------------------------------------
@@ -33,9 +33,19 @@ outDir <- ""
 # ----------------------------------------------------------------------
 
 # add labels to the data
-noTrials <- max(results$trial)
-resultsSub <- results %>%
-    mutate(lineLabel = ifelse(trial == 0.8*noTrials, as.character(algo), NA))
+noTrials <- max(resultsAvg$trial)
+resultsSub <- resultsAvg %>%
+    mutate(
+        lineLabel = ifelse(trial == 0.8*noTrials, as.character(algo), NA),
+        lineLabel = ifelse(lineLabel == "Asymptotic Lower Bound", "ALB", lineLabel))
+
+# add the offset to ALB results so that it passes through 0 at 10^2
+offsets <- resultsSub %>% 
+    filter(trial == 10^2, algo == "Asymptotic Lower Bound")
+for (i in 1:nrow(offsets)) {
+    idx <- resultsSub$algo == "Asymptotic Lower Bound" & resultsSub$noArms == offsets$noArms[i]  & resultsSub$epsilon == offsets$epsilon[i]
+    resultsSub$reg_mean[idx] <- resultsSub$reg_mean[idx] - offsets$reg_mean[i]
+}
 
 
 # ----------------------------------------------------------------------
@@ -53,8 +63,8 @@ genPlot <- function(plotData, yMax, yStep) {
     geom_label_repel( 
         aes(x = trial, y = reg_mean, label = lineLabel),
         colour = "black", segment.alpha = 1,
-        segment.colour = "black", segment.size = 0.5, force = 3,
-        min.segment.length = unit(0.1, "lines"),
+        segment.colour = "black", segment.size = 0.5, force = 10,
+        min.segment.length = unit(0.3, "lines"),
         size = fontSize,
         inherit.aes = FALSE) + 
     scale_x_continuous("Time (in log units)",
@@ -96,22 +106,22 @@ epsilon002_K100 <- genPlot(
 # Saving figures
 # ----------------------------------------------------------------------
 
-filename <- paste0(outDir, "epsilon01_K10.pdf")
+filename <- paste0(outDir, "figure1_epsilon01_K10_update1.pdf")
 cairo_pdf(filename, height = 3, width = 3.5, onefile = TRUE)
 print(epsilon01_K10)
 dev.off()
 
-filename <- paste0(outDir, "epsilon002_K10.pdf")
+filename <- paste0(outDir, "figure1_epsilon002_K10_update1.pdf")
 cairo_pdf(filename, height = 3, width = 3.5, onefile = TRUE)
 print(epsilon002_K10)
 dev.off()
 
-filename <- paste0(outDir, "epsilon01_K100.pdf")
+filename <- paste0(outDir, "figure1_epsilon01_K100_update1.pdf")
 cairo_pdf(filename, height = 3, width = 3.5, onefile = TRUE)
 print(epsilon01_K100)
 dev.off()
 
-filename <- paste0(outDir, "epsilon002_K100.pdf")
+filename <- paste0(outDir, "figure1_epsilon002_K100_update1.pdf")
 cairo_pdf(filename, height = 3, width = 3.5, onefile = TRUE)
 print(epsilon002_K100)
 dev.off()
