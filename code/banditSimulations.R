@@ -2,7 +2,7 @@
 # Description
 # ----------------------------------------------------------------------
 
-# Script for running the Bernoulli bandit simulations from 
+# Script for running the Bernoulli bandit simulations from Section 3 in
 # Chapelle, Li 2011 article
 
 
@@ -23,7 +23,128 @@ source("banditAlgorithms.R")
 
 
 # ----------------------------------------------------------------------
-# Setting the parameters
+# Setting the parallelization
+# ----------------------------------------------------------------------
+
+# to speed up simulations, we run it in parallel  if multiple cores available
+seed <- 1234
+noCores <-  ifelse(detectCores() == 1, 1, detectCores() - 1)
+registerDoParallel(noCores)
+registerDoRNG(seed)  
+
+
+# ----------------------------------------------------------------------
+# Function for simulations
+# ----------------------------------------------------------------------
+
+simulate <- function(
+    condInfo, 
+    noSim,
+    subsample = 1, 
+    outDir = "",
+    filename = "results"
+    ) {
+
+    # data frame for all results
+    resultsAvg <- data.frame()
+    resultsFin <- data.frame()
+
+    # iterating over conditions
+    for (cond in 1:nrow(condInfo)) {
+        # cond = 2
+        cat("-------------------------------------------------\n
+             Condition: ", cond, " out of ", nrow(condInfo), "\n 
+             -------------------------------------------------\n")
+
+        # prepare the input for the algorithm
+        algo <- algoInfo[[condInfo$algo[cond]]][[1]]
+        algoPars <- algoInfo[[condInfo$algo[cond]]][["pars"]]
+        noTrials <- condInfo$noTrials[cond]
+        env <- list(
+            reward = genBernoulliBandit,
+            noTrials = noTrials,
+            noArms = condInfo$noArms[cond],
+            prob = condInfo$prob[cond],
+            epsilon = condInfo$epsilon[cond],
+            aEnv = condInfo$aEnv[cond],
+            bEnv = condInfo$bEnv[cond]
+        )
+
+        # we have a special treatment of ALB as it can be computed exactly
+        if (condInfo[cond, "algo"] == "Asymptotic Lower Bound") {
+
+            # computing the regret bound
+            algoRes <- algo(env, algoPars)
+
+            # extracting the results
+            algoResults <- algoRes %>%
+                filter(trial %in% 
+                    c(1, seq(subsample, noTrials, subsample))) %>%
+                mutate(iter = 1)
+
+        # else we simulate, in parallel if possible
+        } else {
+
+            # iterating over simulation iterations in parallel
+            algoResults <- foreach(sim = 1:noSim, .combine = rbind) %dorng% {
+
+                # single simulation of an algorithm
+                startTime <-  Sys.time()
+                algoRes <- algo(env, algoPars)
+                endTime <-  Sys.time()
+                runTime <- endTime - startTime
+                cat("Simulation: ", sim, " | Execution time: ", 
+                    as.numeric(runTime, "mins"), "min\n")
+
+                # computing regret
+                algoCumRegret <- data.frame(iter = sim, algoRes) %>%
+                    filter(trial %in% 
+                        c(1, seq(subsample, noTrials, subsample))) 
+
+                # provide some estimate of remaining runs duration
+                cat("Estimated remaining time: ", 
+                    (as.numeric(runTime, "mins")*(noSim-sim)/noCores) *
+                    (nrow(condInfo) - cond + 1), 
+                    "min\n")
+
+                return(algoCumRegret)
+            }
+        }
+
+        # computing averages across simulation runs
+        condResults <- algoResults %>%
+            group_by(trial) %>% 
+            summarise(reg_mean = mean(cumreg), reg_sd = sd(cumreg)) %>% 
+            mutate(
+                algo = condInfo$algo[cond],
+                noArms = condInfo$noArms[cond],
+                epsilon = condInfo$epsilon[cond]
+            )
+        condResultsFin <- algoResults %>%   
+            filter(trial == noTrials) %>% 
+            mutate(
+                algo = condInfo$algo[cond],
+                noArms = condInfo$noArms[cond],
+                epsilon = condInfo$epsilon[cond]
+            )
+        resultsAvg <- rbind(resultsAvg, condResults)
+        resultsFin <- rbind(resultsFin, condResultsFin)
+            
+        # saving interim results
+        save(condResults, condResultsFin, 
+            file = paste0(outDir, filename, "_", cond, ".RData"))
+    }
+
+    # if everything run succesfully, saving the data
+    save(resultsAvg, resultsFin, file = paste0(outDir, filename, ".RData"))
+    cat("---------------- DONE --------------------\n")
+
+}  # END of the function
+
+
+
+# ----------------------------------------------------------------------
+# Simulations for figure 1 - basic Thompson vs UCB, update = 100
 # ----------------------------------------------------------------------
 
 # parameters for simulation
@@ -35,154 +156,216 @@ noTrials <- 10^7
 noArms <- c(10, 100)
 epsilon <- c(0.1, 0.02)
 prob <- 0.5
+aEnv <- NA
+bEnv <- NA
 
 # algorithm info
 algoInfo <- list(
-    "Thompson" = list(Thompson, pars = list(a = 1, b = 1)),
-    "UCB" = list(UCB, pars = NA)
+    "Thompson" = list(Thompson, pars = list(update = 100)),
+    "UCB" = list(UCB, pars = list(update = 100)),
+    "Asymptotic Lower Bound" = list(ALB, pars = list(constant = 0))
 )
-parUpdate <- 1
-
-
-# to speed up simulations, we run it in parallel 
-seed <- 1234
-noCores <-  ifelse(detectCores() == 1, 1, detectCores() - 1)
-registerDoParallel(noCores)
-registerDoRNG(seed)  
-
-
-# ----------------------------------------------------------------------
-# Computing asymptotic lower bounds
-# ----------------------------------------------------------------------
-
-# we can compute them explicitly, no need for simulations
-
-# setting conditions info
-algo <- "Asymptotic Lower Bound"
-constant <- 0
-condInfo <- expand.grid(noArms, epsilon, stringsAsFactors = FALSE)
-colnames(condInfo) <- c("noArms", "epsilon")
-
-# data frame for all results
-boundResults <- data.frame()
-
-# iterating over conditions
-for (cond in 1:nrow(condInfo)) {
-    # cond = 1
-    print(cond)
-
-    # extract number of arms and epsilon from condInfo
-    probs <- c(
-        prob, 
-        rep(prob - condInfo$epsilon[cond], condInfo$noArms[cond] - 1)
-    )
-    
-    # iterating over simulation iterations in parallel
-    algoRes <- 
-        log(1:noTrials) * 
-        (sum((prob - probs) / 
-        sapply( probs, function(x) klDivergence(prob, x)), na.rm = TRUE) + 
-        constant)
-
-    # computing regret
-    results <- data.frame(
-        trial = 1:noTrials,
-        reg_mean = algoRes,
-        reg_sd = NA,
-        algo = algo,
-        noArms = condInfo$noArms[cond],
-        epsilon = condInfo$epsilon[cond]
-    ) %>%
-    filter(trial %in% c(1, seq(subsample, noTrials, subsample))) 
-    boundResults <- rbind(boundResults, results)
-}
-
-
-# ----------------------------------------------------------------------
-# Simulation
-# ----------------------------------------------------------------------
 
 # setting condition info for simulation iterations
-condInfo <- expand.grid(noArms, epsilon, names(algoInfo), 
-    stringsAsFactors = FALSE)
-colnames(condInfo) <- c("noArms", "epsilon", "algo")
+condInfo <- expand.grid(
+    noTrials = noTrials, noArms = noArms, epsilon = epsilon, prob = prob, 
+    aEnv = aEnv, bEnv = aEnv, algo = names(algoInfo), stringsAsFactors = FALSE
+)
 
-# data frame for all results
-simResults <- data.frame()
-
-# iterating over conditions
-for (cond in 1:nrow(condInfo)) {
-    # cond = 1
-    cat("-----------------------------------------------------------------\n
-         -----------------------------------------------------------------\n
-         Condition: ", cond, " out of ", nrow(condInfo), "\n 
-         -----------------------------------------------------------------\n
-         -----------------------------------------------------------------\n")
-
-    # extract number of arms and epsilon from condInfo
-    probs <- c(
-        prob, 
-        rep(prob - condInfo$epsilon[cond], condInfo$noArms[cond] - 1)
-    )
-    algo <- algoInfo[[condInfo$algo[cond]]][[1]]
-    algoPars <- algoInfo[[condInfo$algo[cond]]][["pars"]]
-    noArms <- condInfo$noArms[cond]
-    env <- list(
-        reward = genBernoulliBandit(noArms, probs),
-        noTrials = noTrials,
-        noArms = noArms
-    )
-
-    # iterating over simulation iterations in parallel
-    results <- foreach(sim = 1:noSim, .combine = rbind) %dorng% {
-
-        # single simulation of an algorithm
-        startTime <-  Sys.time()
-        algoRes <- algo(env, algoPars, parUpdate)
-        endTime <-  Sys.time()
-        runTime <- endTime - startTime
-        if (attr(runTime, "units") == "secs") runTime <- runTime/60
-        cat("Simulation: ", sim, " | Execution time: ", 
-            as.numeric(runTime, "mins"), "min\n")
-
-        # computing regret
-        algoCumRegret <- data.frame(
-            iter = sim, 
-            trial = 1:noTrials,
-            cumreg = cumsum(0.5 - probs[algoRes$choices])
-        ) %>%
-        filter(trial %in% c(1, seq(subsample, noTrials, subsample))) 
-
-        # provide some estimate of remaining runs duration
-        cat("Estimated remaining time: ", 
-            as.numeric(runTime, "mins")*(noSim-sim)/noCores*nrow(condInfo), 
-            "min\n")
-
-        return(algoCumRegret)
-    }
-
-    # computing averages across simulation runs
-    results <- results %>%
-        group_by(trial) %>% 
-        summarise(reg_mean = mean(cumreg), reg_sd = sd(cumreg)) %>% 
-        mutate(
-            algo = condInfo$algo[cond],
-            noArms = condInfo$noArms[cond],
-            epsilon = condInfo$epsilon[cond]
-        )
-    simResults <- rbind(simResults, results)
-        
-    # saving interim results
-    save(results, file = paste0("../data/bernoulliBandit_", cond, ".RData"))
-}
+# executing the simulations
+simulate(
+    condInfo, noSim, subsample, 
+    outDir = "../data/", filename = "banditBasic100"
+)
 
 
 # ----------------------------------------------------------------------
-# Saving
+# Simulations for figure 1 - basic Thompson vs UCB, update = 1
 # ----------------------------------------------------------------------
 
-# combining first bound and simulation results
-results <- rbind(boundResults, simResults)
+# parameters for simulation
+noSim <- 100
+subsample <- 100  # we dont save all the data at the end
 
-# if everything run succesfully, saving the data
-save(results, file = "../data/bernoulliBandit.RData")
+# defining the bandit problem characteristics
+noTrials <- 10^7
+noArms <- c(10, 100)
+epsilon <- c(0.1, 0.02)
+prob <- 0.5
+aEnv <- NA
+bEnv <- NA
+
+# algorithm info
+algoInfo <- list(
+    "Thompson" = list(Thompson, pars = list(update = 1)),
+    "UCB" = list(UCB, pars = list(update = 1)),
+    "Asymptotic Lower Bound" = list(ALB, pars = list(constant = 0))
+)
+
+# setting condition info for simulation iterations
+condInfo <- expand.grid(
+    noTrials = noTrials, noArms = noArms, epsilon = epsilon, prob = prob, 
+    aEnv = aEnv, bEnv = aEnv, algo = names(algoInfo), stringsAsFactors = FALSE
+)
+
+# executing the simulations
+simulate(
+    condInfo, noSim, subsample, 
+    outDir = "../data/", filename = "banditBasic1"
+)
+
+
+# ----------------------------------------------------------------------
+# Simulations for Thompson sampling with prior mismatch 
+# ----------------------------------------------------------------------
+
+# parameters for simulation
+noSim <- 100
+subsample <- 100  # we dont save all the data at the end
+
+# defining the bandit problem characteristics
+noTrials <- 10^7
+noArms <- c(10, 100)
+epsilon <- 0.02
+prob <- 0.1
+aEnv <- NA
+bEnv <- NA
+
+# algorithm info
+algoInfo <- list(
+    "Thompson" = list(Thompson, pars = list(a = 1, b = 1, alpha = 1)),
+    "UCB" = list(UCB, pars = list()),
+    "Asymptotic Lower Bound" = list(ALB, pars = list(constant = 0))
+)
+
+# setting condition info for simulation iterations
+condInfo <- expand.grid(
+    noTrials = noTrials, noArms = noArms, epsilon = epsilon, prob = prob, 
+    aEnv = aEnv, bEnv = aEnv, algo = names(algoInfo), stringsAsFactors = FALSE
+)
+
+
+# executing the simulations
+simulate(
+    condInfo, noSim, subsample, 
+    outDir = "../data/", filename = "banditPriorMismatch"
+)
+
+
+# ----------------------------------------------------------------------
+# Simulations for figure 2 - optimistic Thompson sampling  
+# ----------------------------------------------------------------------
+
+# parameters for simulation
+noSim <- 100
+subsample <- 100  
+
+# defining the bandit problem characteristics
+noTrials <- 10^7
+noArms <- c(10, 100)
+epsilon <- c(0.1, 0.02)
+prob <- 0.5
+aEnv <- NA
+bEnv <- NA
+
+# algorithm info
+algoInfo <- list(
+    "OBS" = list(Thompson, pars = list(optimistic = TRUE))
+)
+
+# setting condition info for simulation iterations
+condInfo <- expand.grid(
+    noTrials = noTrials, noArms = noArms, epsilon = epsilon, prob = prob, 
+    aEnv = aEnv, bEnv = aEnv, algo = names(algoInfo), stringsAsFactors = FALSE
+)
+
+# executing the simulations
+simulate(
+    condInfo, noSim, subsample, 
+    outDir = "../data/", filename = "banditOptimistic"
+)
+
+
+# ----------------------------------------------------------------------
+# Simulations for figure 3 - posterior reshaping for Thompson sampling
+# ----------------------------------------------------------------------
+
+# parameters for simulation
+noSim <- 1000
+subsample <- 100  # we dont save all the data at the end
+
+# defining the bandit problem characteristics
+noTrials <- 10^7
+noArms <- c(10)
+epsilon <- c(0.02)
+prob <- 0.5
+aEnv <- NA
+bEnv <- NA
+
+# algorithm info
+algoInfo <- list(
+    "Thompson_2" = list(Thompson, pars = list(alpha = 2)),
+    "Thompson_1" = list(Thompson, pars = list(alpha = 1)),
+    "Thompson_05" = list(Thompson, pars = list(alpha = 0.5)),
+    "Thompson_025" = list(Thompson, pars = list(alpha = 0.25)),
+    "Asymptotic Lower Bound" = list(ALB, pars = list(constant = 0))
+)
+
+# setting condition info for simulation iterations
+condInfo <- expand.grid(
+    noTrials = noTrials, noArms = noArms, epsilon = epsilon, prob = prob, 
+    aEnv = aEnv, bEnv = aEnv, algo = names(algoInfo), stringsAsFactors = FALSE
+)
+
+# executing the simulations
+simulate(
+    condInfo, noSim, subsample, 
+    outDir = "../data/", filename = "banditPosteriorReshaping"
+)
+
+
+# ----------------------------------------------------------------------
+# Simulations for table 1 - impact of delay, Thompson vs UCB
+# ----------------------------------------------------------------------
+
+# parameters for simulation
+noSim <- 100
+subsample <- 100  # we dont save all the data at the end
+
+# defining the bandit problem characteristics
+noTrials <- 10^6
+noArms <- c(10)
+aEnv <- 4
+bEnv <- 4
+epsilon <- NA
+prob <- NA
+
+# algorithm info
+algoInfo <- list(
+    "Thompson_1" = list(bThompson, pars = list(batch = 1)),
+    "Thompson_3" = list(bThompson, pars = list(batch = 3)),
+    "Thompson_10" = list(bThompson, pars = list(batch = 10)),
+    "Thompson_32" = list(bThompson, pars = list(batch = 32)),
+    "Thompson_100" = list(bThompson, pars = list(batch = 100)),
+    "Thompson_316" = list(bThompson, pars = list(batch = 316)),
+    "Thompson_1000" = list(bThompson, pars = list(batch = 1000)),
+    "UCB_1" = list(bUCB, pars = list(batch = 1)),
+    "UCB_3" = list(bUCB, pars = list(batch = 3)),
+    "UCB_10" = list(bUCB, pars = list(batch = 10)),
+    "UCB_32" = list(bUCB, pars = list(batch = 32)),
+    "UCB_100" = list(bUCB, pars = list(batch = 100)),
+    "UCB_316" = list(bUCB, pars = list(batch = 316)),
+    "UCB_1000" = list(bUCB, pars = list(batch = 1000))
+)
+
+# setting condition info for simulation iterations
+condInfo <- expand.grid(
+    noTrials = noTrials, noArms = noArms, epsilon = epsilon, prob = prob, 
+    aEnv = aEnv, bEnv = aEnv, algo = names(algoInfo), stringsAsFactors = FALSE
+)
+
+# executing the simulations
+simulate(
+    condInfo, noSim, subsample, 
+    outDir = "../data/", filename = "banditDelay"
+)
