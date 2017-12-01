@@ -41,28 +41,41 @@ genBernoulliBandit <- function(noArms, prob) {
 # ----------------------------------------------------------------------
 
 
-Thompson <- function(env, pars = list(a = 1, b = 1, alpha = 1, update = 1)) {
+Thompson <- function(env, pars = list(alpha = 1, batch = 1)) {
 
     # basic vars
     aPrior <- ifelse(is.null(pars[["a"]]), 1, pars[["a"]]) 
     bPrior <- ifelse(is.null(pars[["b"]]), 1, pars[["b"]])
     alphaReshape <- ifelse(is.null(pars[["alpha"]]), 1, pars[["alpha"]])
-    update <- ifelse(is.null(pars[["update"]]), 1, pars[["update"]])
+    batch <- ifelse(is.null(pars[["batch"]]), 100, pars[["batch"]])
     optimistic <- ifelse(is.null(pars[["optimistic"]]), FALSE, 
         pars[["optimistic"]])
+    dynamic <- env[["dynamic"]]
     noTrials <- env[["noTrials"]]
     noArms <- env[["noArms"]]
-    probMax <- env[["prob"]] 
-    probs <- c(probMax, rep(probMax - env[["epsilon"]], noArms - 1))
-    rewardFnc <- env[["reward"]](noArms, probs)
-
+    rewardFnc <- env[["reward"]]
+    if (dynamic) {
+        aEnv <- env[["aEnv"]]
+        bEnv <- env[["bEnv"]]
+        probs <- rbeta(noArms, aEnv, bEnv)
+        probMax <- probs[idxMax(probs)]
+        pChange <- env[["pChange"]]
+    } else {
+        probMax <- env[["prob"]] 
+        probs <- c(probMax, rep(probMax - env[["epsilon"]], noArms - 1))
+    }
+    
     # objects for results
     choices <- rep(NA, noTrials)
     success <- rep(0, noArms)
     failure <- rep(0, noArms)
-
+    successBatch <- rep(0, noArms)
+    failureBatch <- rep(0, noArms)
+    regret <- rep(NA, noTrials)
+    
     for (trial in 1:noTrials) {
-        
+        # trial=100
+
         # draw prob of reward based on the model of the environment 
         # i.e. from the posterior distribution P(theta|data)
         thetat <- rbeta(
@@ -82,159 +95,10 @@ Thompson <- function(env, pars = list(a = 1, b = 1, alpha = 1, update = 1)) {
         choices[trial] <- choice
 
         # environment returns a reward for a given choice
-        reward <- rewardFnc()[choice]
-
-        # update the model of the environment, e.g. only every 100 trials  
-        if (trial %% update == 0) {
-            if(reward == 0) {
-                failure[choice] <- failure[choice] + 1
-            } else {
-                success[choice] <- success[choice] + 1
-            }
-        }
-    }
-
-    # computing and returning cumulative regret
-    regret <- data.frame(
-        trial = 1:noTrials,
-        cumreg = cumsum(probMax - probs[choices])
-    ) 
-    return(regret)
-}
-
-
-UCB <- function(env, pars = list(update = 1)) {
-
-    # basic vars
-    noTrials <- env[["noTrials"]]
-    noArms <- env[["noArms"]]
-    rewardFnc <- env[["reward"]]
-    update <- ifelse(is.null(pars[["update"]]), 1, pars[["update"]])
-    probMax <- env[["prob"]] 
-    probs <- c(probMax, rep(probMax - env[["epsilon"]], noArms - 1))
-    rewardFnc <- env[["reward"]](noArms, probs)
-
-    # objects for results
-    choices <- rep(NA, noTrials)
-    k <- rep(0, noArms)  
-    m <- rep(0, noArms)
-
-    for (trial in 1:noTrials) {
-        # trial = 11
-        
-        idxNontried <- m == 0
-        if (any(idxNontried)) {
-            ucbEst <- idxNontried*1
-        } else {
-            # update delta 
-            delta <- sqrt(1 / trial)
-
-            # computing the upper confidence bound
-            ucbEst <- k / m + 
-                      sqrt((2*(k/m)*log(1/delta)) / m) + 
-                      (2*log(1/delta)) / m
-        }
-
-        # choice according to the best bound
-        choice <- idxMax(ucbEst)
-        choices[trial] <- choice
-
-        # environment returns a reward for a given choice
-        reward <- rewardFnc()[choice]
-
-        # update the model of the environment, e.g. only every 100 trials 
-        if (trial %% update == 0) {
-            k[choice] <- k[choice] + reward
-            m[choice] <- m[choice] + 1
-        }
-    }
-
-    # computing and returning cumulative regret
-    regret <- data.frame(
-        trial = 1:noTrials,
-        cumreg = cumsum(probMax - probs[choices])
-    ) 
-    return(regret)
-}
-
-
-ALB <- function(env, pars = list(constant = 0)) {
-
-    # basic vars
-    noTrials <- env[["noTrials"]]
-    noArms <- env[["noArms"]]
-    probMax <- env[["prob"]]
-    probs <- rep(probMax - env[["epsilon"]], noArms - 1)
-    constant <- ifelse(is.null(pars[["constant"]]), 0, pars[["constant"]])
-
-    # help function for KL divergence
-    klDivergence <- function(p, q) {
-        p *log(p/q) + (1-p)*log((1-p)/(1-q))
-    }
-
-    # computing the bound
-    bound <- 
-        log(1:noTrials) * 
-        (sum((probMax - probs) / 
-        sapply( probs, function(x) klDivergence(x, probMax)), na.rm = TRUE) + 
-        constant)
-
-    # computing and returning cumulative regret
-    regret <- data.frame(
-        trial = 1:noTrials,
-        cumreg = bound
-    ) 
-    return(regret)
-}
-
-
-# ----
-# Versions for delay exercise
-# ----
-
-
-bThompson <- function(env, pars = list(alpha = 1, batch = 1)) {
-
-    # basic vars
-    aPrior <- ifelse(is.null(pars[["a"]]), 1, pars[["a"]]) 
-    bPrior <- ifelse(is.null(pars[["b"]]), 1, pars[["b"]])
-    alphaReshape <- ifelse(is.null(pars[["alpha"]]), 1, pars[["alpha"]])
-    batch <- pars[["batch"]]
-    aEnv <- env[["aEnv"]]
-    bEnv <- env[["bEnv"]]
-    noTrials <- env$noTrials
-    noArms <- env$noArms
-    rewardFnc <- env$reward
-    probs <- rbeta(noArms, aEnv, bEnv)
-    probMax <- probs[idxMax(probs)]
-
-    # objects for results
-    choices <- rep(NA, noTrials)
-    success <- rep(0, noArms)
-    failure <- rep(0, noArms)
-    successBatch <- rep(0, noArms)
-    failureBatch <- rep(0, noArms)
-    regret <- rep(NA, noTrials)
-
-    for (trial in 1:noTrials) {
-        # trial=100
-
-        # draw prob of reward based on the model of the environment 
-        # i.e. from the posterior distribution P(theta|data)
-        thetat <- rbeta(
-            noArms, 
-            (success + aPrior)/alphaReshape, 
-            (failure + bPrior)/alphaReshape
-        )
-
-        # choice according to the draws from the posterior
-        choice <- which.max(thetat)
-        choices[trial] <- choice
-
-        # environment returns a reward for a given choice
-        if (runif(1) < 10^(-3)) {
+        if (dynamic && (runif(1) < pChange)) {
             idx <- sample(1:noArms, 1)
             probs[idx] <- rbeta(1, aEnv, bEnv)
+            success[idx] <- 0; failure[idx] <- 0
             probMax <- probs[idxMax(probs)]
         } 
         reward <- rewardFnc(noArms, probs)()[choice]
@@ -265,17 +129,24 @@ bThompson <- function(env, pars = list(alpha = 1, batch = 1)) {
 }
 
 
-bUCB <- function(env, pars = list(batch = 1)) {
+UCB <- function(env, pars = list(batch = 1)) {
 
     # basic vars
-    noTrials <- env$noTrials
-    noArms <- env$noArms
-    aEnv <- env[["aEnv"]]
-    bEnv <- env[["bEnv"]]
-    batch <- pars[["batch"]]
-    rewardFnc <- env$reward
-    probs <- rbeta(noArms, aEnv, bEnv)
-    probMax <- probs[idxMax(probs)]
+    batch <- ifelse(is.null(pars[["batch"]]), 100, pars[["batch"]])
+    dynamic <- env[["dynamic"]]
+    noTrials <- env[["noTrials"]]
+    noArms <- env[["noArms"]]
+    rewardFnc <- env[["reward"]]
+    if (dynamic) {
+        aEnv <- env[["aEnv"]]
+        bEnv <- env[["bEnv"]]
+        probs <- rbeta(noArms, aEnv, bEnv)
+        probMax <- probs[idxMax(probs)]
+        pChange <- env[["pChange"]]
+    } else {
+        probMax <- env[["prob"]] 
+        probs <- c(probMax, rep(probMax - env[["epsilon"]], noArms - 1))
+    }
 
     # objects for results
     choices <- rep(NA, noTrials)
@@ -285,7 +156,14 @@ bUCB <- function(env, pars = list(batch = 1)) {
     mBatch <- rep(0, noArms)
     regret <- rep(NA, noTrials)
 
-    for (trial in 1:noTrials) {
+    # initialize the algo
+    choices[1:noArms] <- 1:noArms
+    reward <- rewardFnc(noArms, probs)()
+    regret[1:noArms] <- probMax - probs
+    k <- k + reward
+    m <- m + 1
+
+    for (trial in (noArms + 1):noTrials) {
         # trial = 11
         
         idxNontried <- m == 0
@@ -303,11 +181,12 @@ bUCB <- function(env, pars = list(batch = 1)) {
 
         # choice according to the best bound
         choice <- idxMax(ucbEst)
-        choices[trial] <- choice
+        choices[1:trial] <- choice
 
         # environment returns a reward for a given choice
-        if (runif(1) < 10^(-3)) {
+        if (dynamic && (runif(1) < pChange)) {
             idx <- sample(1:noArms, 1)
+            k[idx] <- 0; m[idx] <- 0
             probs[idx] <- rbeta(1, aEnv, bEnv)
             probMax <- probs[idxMax(probs)]
         } 
@@ -331,6 +210,36 @@ bUCB <- function(env, pars = list(batch = 1)) {
     regret <- data.frame(
         trial = 1:noTrials,
         cumreg = cumsum(regret)
+    ) 
+    return(regret)
+}
+
+
+ALB <- function(env, pars = list(constant = 0)) {
+
+    # basic vars
+    noTrials <- env[["noTrials"]]
+    noArms <- env[["noArms"]]
+    probMax <- env[["prob"]]
+    probs <- rep(probMax - env[["epsilon"]], noArms - 1)
+    constant <- ifelse(is.null(pars[["constant"]]), 0, pars[["constant"]])
+
+    # help function for KL divergence
+    klDivergence <- function(p, q) {
+        p *log(p/q) + (1-p)*log((1-p)/(1-q))
+    }
+
+    # computing the bound
+    bound <- 
+        log(1:noTrials) * 
+        (sum((probMax - probs) / 
+        sapply( probs, function(x) klDivergence(x, probMax)), na.rm = TRUE) + 
+        constant)
+
+    # computing and returning cumulative regret
+    regret <- data.frame(
+        trial = 1:noTrials,
+        cumreg = bound
     ) 
     return(regret)
 }

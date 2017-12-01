@@ -63,11 +63,13 @@ simulate <- function(
         env <- list(
             reward = genBernoulliBandit,
             noTrials = noTrials,
+            dynamic = condInfo$dynamic[cond],
             noArms = condInfo$noArms[cond],
             prob = condInfo$prob[cond],
             epsilon = condInfo$epsilon[cond],
             aEnv = condInfo$aEnv[cond],
-            bEnv = condInfo$bEnv[cond]
+            bEnv = condInfo$bEnv[cond],
+            pChange = condInfo$pChange[cond]
         )
 
         # we have a special treatment of ALB as it can be computed exactly
@@ -131,8 +133,8 @@ simulate <- function(
         resultsFin <- rbind(resultsFin, condResultsFin)
             
         # saving interim results
-        save(condResults, condResultsFin, 
-            file = paste0(outDir, filename, "_", cond, ".RData"))
+        # save(condResults, condResultsFin, 
+            # file = paste0(outDir, filename, "_", cond, ".RData"))
     }
 
     # if everything run succesfully, saving the data
@@ -144,7 +146,7 @@ simulate <- function(
 
 
 # ----------------------------------------------------------------------
-# Simulations for figure 1 - basic Thompson vs UCB, update = 100
+# Simulations for figure 1 - basic Thompson vs UCB
 # ----------------------------------------------------------------------
 
 # parameters for simulation
@@ -156,62 +158,29 @@ noTrials <- 10^7
 noArms <- c(10, 100)
 epsilon <- c(0.1, 0.02)
 prob <- 0.5
+dynamic <- FALSE
 aEnv <- NA
 bEnv <- NA
+pChange <- NA
 
 # algorithm info
 algoInfo <- list(
-    "Thompson" = list(Thompson, pars = list(update = 100)),
-    "UCB" = list(UCB, pars = list(update = 100)),
-    "Asymptotic Lower Bound" = list(ALB, pars = list(constant = 0))
+    "Thompson" = list(Thompson),
+    "UCB" = list(UCB),
+    "Asymptotic Lower Bound" = list(ALB)
 )
 
 # setting condition info for simulation iterations
 condInfo <- expand.grid(
     noTrials = noTrials, noArms = noArms, epsilon = epsilon, prob = prob, 
-    aEnv = aEnv, bEnv = aEnv, algo = names(algoInfo), stringsAsFactors = FALSE
+    dynamic = dynamic, aEnv = aEnv, bEnv = aEnv, pChange = pChange,
+    algo = names(algoInfo), stringsAsFactors = FALSE
 )
 
 # executing the simulations
 simulate(
     condInfo, noSim, subsample, 
-    outDir = "../data/", filename = "banditBasic100"
-)
-
-
-# ----------------------------------------------------------------------
-# Simulations for figure 1 - basic Thompson vs UCB, update = 1
-# ----------------------------------------------------------------------
-
-# parameters for simulation
-noSim <- 100
-subsample <- 100  # we dont save all the data at the end
-
-# defining the bandit problem characteristics
-noTrials <- 10^7
-noArms <- c(10, 100)
-epsilon <- c(0.1, 0.02)
-prob <- 0.5
-aEnv <- NA
-bEnv <- NA
-
-# algorithm info
-algoInfo <- list(
-    "Thompson" = list(Thompson, pars = list(update = 1)),
-    "UCB" = list(UCB, pars = list(update = 1)),
-    "Asymptotic Lower Bound" = list(ALB, pars = list(constant = 0))
-)
-
-# setting condition info for simulation iterations
-condInfo <- expand.grid(
-    noTrials = noTrials, noArms = noArms, epsilon = epsilon, prob = prob, 
-    aEnv = aEnv, bEnv = aEnv, algo = names(algoInfo), stringsAsFactors = FALSE
-)
-
-# executing the simulations
-simulate(
-    condInfo, noSim, subsample, 
-    outDir = "../data/", filename = "banditBasic1"
+    outDir = "../data/", filename = "banditBasic"
 )
 
 
@@ -228,20 +197,24 @@ noTrials <- 10^7
 noArms <- c(10, 100)
 epsilon <- 0.02
 prob <- 0.1
+dynamic <- FALSE
 aEnv <- NA
 bEnv <- NA
+pChange <- NA
+
 
 # algorithm info
 algoInfo <- list(
-    "Thompson" = list(Thompson, pars = list(a = 1, b = 1, alpha = 1)),
-    "UCB" = list(UCB, pars = list()),
-    "Asymptotic Lower Bound" = list(ALB, pars = list(constant = 0))
+    "Thompson" = list(Thompson),
+    "UCB" = list(UCB),
+    "Asymptotic Lower Bound" = list(ALB)
 )
 
 # setting condition info for simulation iterations
 condInfo <- expand.grid(
     noTrials = noTrials, noArms = noArms, epsilon = epsilon, prob = prob, 
-    aEnv = aEnv, bEnv = aEnv, algo = names(algoInfo), stringsAsFactors = FALSE
+    dynamic = dynamic, aEnv = aEnv, bEnv = aEnv, pChange = pChange,
+    algo = names(algoInfo), stringsAsFactors = FALSE
 )
 
 
@@ -265,8 +238,10 @@ noTrials <- 10^7
 noArms <- c(10, 100)
 epsilon <- c(0.1, 0.02)
 prob <- 0.5
+dynamic <- FALSE
 aEnv <- NA
 bEnv <- NA
+pChange <- NA
 
 # algorithm info
 algoInfo <- list(
@@ -276,7 +251,8 @@ algoInfo <- list(
 # setting condition info for simulation iterations
 condInfo <- expand.grid(
     noTrials = noTrials, noArms = noArms, epsilon = epsilon, prob = prob, 
-    aEnv = aEnv, bEnv = aEnv, algo = names(algoInfo), stringsAsFactors = FALSE
+    dynamic = dynamic, aEnv = aEnv, bEnv = aEnv, pChange = pChange,
+    algo = names(algoInfo), stringsAsFactors = FALSE
 )
 
 # executing the simulations
@@ -299,8 +275,10 @@ noTrials <- 10^7
 noArms <- c(10)
 epsilon <- c(0.02)
 prob <- 0.5
+dynamic <- FALSE
 aEnv <- NA
 bEnv <- NA
+pChange <- NA
 
 # algorithm info
 algoInfo <- list(
@@ -314,7 +292,8 @@ algoInfo <- list(
 # setting condition info for simulation iterations
 condInfo <- expand.grid(
     noTrials = noTrials, noArms = noArms, epsilon = epsilon, prob = prob, 
-    aEnv = aEnv, bEnv = aEnv, algo = names(algoInfo), stringsAsFactors = FALSE
+    dynamic = dynamic, aEnv = aEnv, bEnv = aEnv, pChange = pChange,
+    algo = names(algoInfo), stringsAsFactors = FALSE
 )
 
 # executing the simulations
@@ -335,10 +314,12 @@ subsample <- 100  # we dont save all the data at the end
 # defining the bandit problem characteristics
 noTrials <- 10^6
 noArms <- c(10)
-aEnv <- 4
-bEnv <- 4
 epsilon <- NA
 prob <- NA
+dynamic <- TRUE
+aEnv <- 4
+bEnv <- 4
+pChange <- 10^(-3)
 
 # algorithm info
 algoInfo <- list(
@@ -361,7 +342,8 @@ algoInfo <- list(
 # setting condition info for simulation iterations
 condInfo <- expand.grid(
     noTrials = noTrials, noArms = noArms, epsilon = epsilon, prob = prob, 
-    aEnv = aEnv, bEnv = aEnv, algo = names(algoInfo), stringsAsFactors = FALSE
+    dynamic = dynamic, aEnv = aEnv, bEnv = aEnv, pChange = pChange,
+    algo = names(algoInfo), stringsAsFactors = FALSE
 )
 
 # executing the simulations
