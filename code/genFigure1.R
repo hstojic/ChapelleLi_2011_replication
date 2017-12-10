@@ -22,7 +22,7 @@ rm(list = ls())
 source("utils.R")
 
 # load the dataset
-load(file = "../data/banditBasic1.RData")
+load(file = "../data/banditBasic.RData")
 
 # outDir
 outDir <- "../article/"
@@ -106,22 +106,22 @@ epsilon002_K100 <- genPlot(
 # Saving figures
 # ----------------------------------------------------------------------
 
-filename <- paste0(outDir, "figure1_epsilon01_K10_update1.pdf")
+filename <- paste0(outDir, "figure1_epsilon01_K10.pdf")
 cairo_pdf(filename, height = 3, width = 3.5, onefile = TRUE)
 print(epsilon01_K10)
 dev.off()
 
-filename <- paste0(outDir, "figure1_epsilon002_K10_update1.pdf")
+filename <- paste0(outDir, "figure1_epsilon002_K10.pdf")
 cairo_pdf(filename, height = 3, width = 3.5, onefile = TRUE)
 print(epsilon002_K10)
 dev.off()
 
-filename <- paste0(outDir, "figure1_epsilon01_K100_update1.pdf")
+filename <- paste0(outDir, "figure1_epsilon01_K100.pdf")
 cairo_pdf(filename, height = 3, width = 3.5, onefile = TRUE)
 print(epsilon01_K100)
 dev.off()
 
-filename <- paste0(outDir, "figure1_epsilon002_K100_update1.pdf")
+filename <- paste0(outDir, "figure1_epsilon002_K100.pdf")
 cairo_pdf(filename, height = 3, width = 3.5, onefile = TRUE)
 print(epsilon002_K100)
 dev.off()
