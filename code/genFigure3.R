@@ -35,10 +35,10 @@ noTrials <- max(resultsAvg$trial)
 # algo labels 
 algoLabels <- c(
     "Asymptotic Lower Bound" = "ALB",
-    "Thompson_2" = "alpha = 2",
-    "Thompson_1" = "alpha = 1",
-    "Thompson_05" = "alpha = 0.5",
-    "Thompson_025" = "alpha = 0.25"
+    "Thompson_2" = "2",
+    "Thompson_1" = "1",
+    "Thompson_05" = "0.5",
+    "Thompson_025" = "0.25"
 )
  
 # add labels to the data
@@ -99,7 +99,7 @@ epsilon002_K10_PosteriorReshaping_boxplot <-
     geom_boxplot(outlier.alpha = 0.6, outlier.size = 0.4, size = 0.3,
         outlier.colour = cbbPalette[7], outlier.shape = 3) +
     geom_hline(yintercept = 6000, linetype = 2) +
-    scale_x_discrete("alpha",
+    scale_x_discrete(expression(alpha),
         labels = c("2"=2, "1"=1, "05"=0.5, "025"=0.25),
         limits = c("2", "1", "05", "025")) +
     scale_y_continuous("Cumulative regret", 
