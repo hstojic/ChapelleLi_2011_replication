@@ -134,7 +134,7 @@ simulate <- function(
             
         # saving interim results
         # save(condResults, condResultsFin, 
-            # file = paste0(outDir, filename, "_", cond, ".RData"))
+        #     file = paste0(outDir, filename, "_", cond, ".RData"))
     }
 
     # if everything run succesfully, saving the data
@@ -323,20 +323,20 @@ pChange <- 10^(-3)
 
 # algorithm info
 algoInfo <- list(
-    "Thompson_1" = list(bThompson, pars = list(batch = 1)),
-    "Thompson_3" = list(bThompson, pars = list(batch = 3)),
-    "Thompson_10" = list(bThompson, pars = list(batch = 10)),
-    "Thompson_32" = list(bThompson, pars = list(batch = 32)),
-    "Thompson_100" = list(bThompson, pars = list(batch = 100)),
-    "Thompson_316" = list(bThompson, pars = list(batch = 316)),
-    "Thompson_1000" = list(bThompson, pars = list(batch = 1000)),
-    "UCB_1" = list(bUCB, pars = list(batch = 1)),
-    "UCB_3" = list(bUCB, pars = list(batch = 3)),
-    "UCB_10" = list(bUCB, pars = list(batch = 10)),
-    "UCB_32" = list(bUCB, pars = list(batch = 32)),
-    "UCB_100" = list(bUCB, pars = list(batch = 100)),
-    "UCB_316" = list(bUCB, pars = list(batch = 316)),
-    "UCB_1000" = list(bUCB, pars = list(batch = 1000))
+    "Thompson_1" = list(Thompson, pars = list(batch = 1)),
+    "Thompson_3" = list(Thompson, pars = list(batch = 3)),
+    "Thompson_10" = list(Thompson, pars = list(batch = 10)),
+    "Thompson_32" = list(Thompson, pars = list(batch = 32)),
+    "Thompson_100" = list(Thompson, pars = list(batch = 100)),
+    "Thompson_316" = list(Thompson, pars = list(batch = 316)),
+    "Thompson_1000" = list(Thompson, pars = list(batch = 1000)),
+    "UCB_1" = list(UCB, pars = list(batch = 1)),
+    "UCB_3" = list(UCB, pars = list(batch = 3)),
+    "UCB_10" = list(UCB, pars = list(batch = 10)),
+    "UCB_32" = list(UCB, pars = list(batch = 32)),
+    "UCB_100" = list(UCB, pars = list(batch = 100)),
+    "UCB_316" = list(UCB, pars = list(batch = 316)),
+    "UCB_1000" = list(UCB, pars = list(batch = 1000))
 )
 
 # setting condition info for simulation iterations

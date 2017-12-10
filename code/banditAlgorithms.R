@@ -181,7 +181,7 @@ UCB <- function(env, pars = list(batch = 1)) {
 
         # choice according to the best bound
         choice <- idxMax(ucbEst)
-        choices[1:trial] <- choice
+        choices[trial] <- choice
 
         # environment returns a reward for a given choice
         if (dynamic && (runif(1) < pChange)) {
