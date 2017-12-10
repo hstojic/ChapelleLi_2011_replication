@@ -29,7 +29,7 @@ outDir <- "../article/"
 
 
 # combining the datasets
-load(file = "../data/banditBasic1.RData")
+load(file = "../data/banditBasic.RData")
 resultsBasic <- filter(resultsAvg, algo == "Thompson")
 load(file = "../data/banditOptimistic.RData")
 resultsAvg <- rbind(resultsAvg, resultsBasic)
